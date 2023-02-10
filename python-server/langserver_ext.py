@@ -3,11 +3,10 @@ import logging
 import subprocess
 import threading
 import os
-import signal
 
 from tornado import ioloop, process, web, websocket
 
-from pyls_jsonrpc import streams
+from pylsp_jsonrpc import streams
 
 from lxpy import copy_headers_dict
 
@@ -35,7 +34,7 @@ class LanguageServerWebSocketHandler(websocket.WebSocketHandler):
 
         # Create an instance of the language server
         proc = process.Subprocess(
-            ['pyls', '-v'],
+            ['pylsp', '-v'],
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE
         )
@@ -76,27 +75,55 @@ class LanguageServerWebSocketHandler(websocket.WebSocketHandler):
 
     def on_message(self, message):
         """Forward client->server messages to the endpoint."""
-        self.writer.write(json.loads(message))
+        """ 由于pyls不提供resolve方法，monaco-edit会请求此方法，为了避免服务端报错，故过滤掉此方法 """
+        context = json.loads(message)
+        if context["method"] == "textDocument/didOpen":
+            if os.path.splitext(context["params"]["textDocument"]["uri"])[-1] == ".py":
+                context["params"]["textDocument"]["text"] = \
+                    "from pyspark.conf import SparkConf\nfrom pyspark.context " \
+                    "import SparkContext\nfrom pyspark.sql.session import " \
+                    "SparkSession\nfrom pyspark.rdd import RDD\nfrom pyspark.sql " \
+                    "import SQLContext, HiveContext, Row\n\nconf = SparkConf(" \
+                    ")\nconf.setMaster(\"local\").setAppName(\"Editor Local " \
+                    "Example\")\nsc = SparkContext(conf=conf)\nsqlContext = " \
+                    "HiveContext(sc)\nspark = SparkSession(sc)\n" \
+                    + context["params"]["textDocument"]["text"]
+            print("didOpen:", context)
+            self.writer.write(context)
+        elif context["method"] == "textDocument/didChange":
+            if os.path.splitext(context["params"]["textDocument"]["uri"])[-1] == ".py":
+                for range in context["params"]["contentChanges"]:
+                    range['range']['start']['line'] = range['range']['start']['line'] + 11
+                    range['range']['end']['line'] = range['range']['end']['line'] + 11
+            print("didChange:", context)
+            self.writer.write(context)
+        elif context["method"] == "textDocument/completion":
+            if os.path.splitext(context["params"]["textDocument"]["uri"])[-1] == ".py":
+                context['params']['position']['line'] = context['params']['position']['line'] + 11
+            print("completion:", context)
+            self.writer.write(context)
+        else:
+            self.writer.write(context)
 
     def check_origin(self, origin):
         return True
 
     def on_close(self) -> None:
         log.info("=============on_close==============")
-        try:
-            log.info("=========before catch========")
-            log.info(self.map_catch)
-            if self.map_catch != {}:
-                for pid in self.map_catch[self.cookie]:
+        log.info("=========before catch========")
+        log.info(self.map_catch)
+        if self.map_catch != {}:
+            for pid in self.map_catch[self.cookie]:
+                try:
                     log.info("<<<<<<kill pid>>>>>")
                     log.info(pid)
                     os.kill(int(pid), 9)
                     log.info(True)
+                except Exception as err:
+                    log.error(err)
             del self.map_catch[self.cookie]
             log.info("=======after delete map_catch:=======")
             log.info(self.map_catch)
-        except Exception as err:
-            log.error(err)
         log.info("==========close-end==============")
 
     def absolve_cookie(self):
