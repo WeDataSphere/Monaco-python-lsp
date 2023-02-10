@@ -88,22 +88,15 @@ class LanguageServerWebSocketHandler(websocket.WebSocketHandler):
                     "Example\")\nsc = SparkContext(conf=conf)\nsqlContext = " \
                     "HiveContext(sc)\nspark = SparkSession(sc)\n" \
                     + context["params"]["textDocument"]["text"]
-            print("didOpen:", context)
-            self.writer.write(context)
         elif context["method"] == "textDocument/didChange":
             if os.path.splitext(context["params"]["textDocument"]["uri"])[-1] == ".py":
                 for range in context["params"]["contentChanges"]:
                     range['range']['start']['line'] = range['range']['start']['line'] + 11
                     range['range']['end']['line'] = range['range']['end']['line'] + 11
-            print("didChange:", context)
-            self.writer.write(context)
         elif context["method"] == "textDocument/completion":
             if os.path.splitext(context["params"]["textDocument"]["uri"])[-1] == ".py":
                 context['params']['position']['line'] = context['params']['position']['line'] + 11
-            print("completion:", context)
-            self.writer.write(context)
-        else:
-            self.writer.write(context)
+        self.writer.write(context)
 
     def check_origin(self, origin):
         return True
