@@ -4,12 +4,8 @@ import subprocess
 import os
 import logging
 
-
 log = logging.getLogger(__name__)
-logging.basicConfig(level=logging.DEBUG, format='%(asctime)s %(levelname)-8s %(message)s',
-                    datefmt='%a, %d %b %Y %H:%M:%S',
-                    filename='/appcom/logs/dssInstall/python-server-out.log',
-                    filemode='w')
+logging.basicConfig(level=logging.DEBUG, format='%(asctime)s %(levelname)-8s %(message)s', datefmt='%a, %d %b %Y %H:%M:%S', filename='/appcom/logs/dssInstall/python-server-out.log', filemode='w')
 
 def func():
     """凌晨1点开启任务"""

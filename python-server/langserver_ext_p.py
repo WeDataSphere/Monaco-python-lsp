@@ -14,7 +14,10 @@ from pylsp_jsonrpc import streams
 from lxpy import copy_headers_dict
 
 log = logging.getLogger(__name__)
-logging.basicConfig(level=logging.DEBUG, format='%(asctime)s %(levelname)-8s %(message)s', datefmt='%a, %d %b %Y %H:%M:%S', filename='/appcom/logs/dssInstall/python-server-out.log', filemode='w')
+logging.basicConfig(level=logging.DEBUG, format='%(asctime)s %(levelname)-8s %(message)s',
+                    datefmt='%a, %d %b %Y %H:%M:%S', filename='/appcom/logs/dssInstall/python-server-out.log',
+                    filemode='w')
+
 
 class LanguageServerWebSocketHandler(websocket.WebSocketHandler):
     """Setup tornado websocket handler to host an external language server."""
@@ -33,7 +36,7 @@ class LanguageServerWebSocketHandler(websocket.WebSocketHandler):
 
         # Create an instance of the language server
         proc = process.Subprocess(
-            ['pylsp', '-vv'],
+            ['Python3', '/appcom/Install/anaconda/bin/pylsp', '-vv'],
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE
         )
@@ -76,32 +79,29 @@ class LanguageServerWebSocketHandler(websocket.WebSocketHandler):
         """Forward client->server messages to the endpoint."""
         """ 由于pyls不提供resolve方法，monaco-edit会请求此方法，为了避免服务端报错，故过滤掉此方法 """
         context = json.loads(message)
-        if context["method"] == "textDocument/changePage":
-            self.on_close()
-        else:
-            if context["method"] == "textDocument/didOpen":
-                if os.path.splitext(context["params"]["textDocument"]["uri"])[-1] == ".py":
-                    context["params"]["textDocument"]["text"] = \
-                        "from pyspark.conf import SparkConf\nfrom pyspark.context " \
-                        "import SparkContext\nfrom pyspark.sql.session import " \
-                        "SparkSession\nfrom pyspark.rdd import RDD\nfrom pyspark.sql " \
-                        "import SQLContext, HiveContext, Row\n\nconf = SparkConf(" \
-                        ")\nconf.setMaster(\"local\").setAppName(\"Editor Local " \
-                        "Example\")\nsc = SparkContext(conf=conf)\nsqlContext = " \
-                        "HiveContext(sc)\nspark = SparkSession(sc)\n" \
-                        + context["params"]["textDocument"]["text"]
-                log.info("didOpen:%s", context)
-            elif context["method"] == "textDocument/didChange":
-                if os.path.splitext(context["params"]["textDocument"]["uri"])[-1] == ".py":
-                    for range in context["params"]["contentChanges"]:
-                        range['range']['start']['line'] = range['range']['start']['line'] + 11
-                        range['range']['end']['line'] = range['range']['end']['line'] + 11
-                log.info("didChange:%s", context)
-            elif context["method"] == "textDocument/completion":
-                if os.path.splitext(context["params"]["textDocument"]["uri"])[-1] == ".py":
-                    context['params']['position']['line'] = context['params']['position']['line'] + 11
-                log.info("completion:%s", context)
-            self.writer.write(context)
+        if context["method"] == "textDocument/didOpen":
+            if os.path.splitext(context["params"]["textDocument"]["uri"])[-1] == ".py":
+                context["params"]["textDocument"]["text"] = \
+                    "from pyspark.conf import SparkConf\nfrom pyspark.context " \
+                    "import SparkContext\nfrom pyspark.sql.session import " \
+                    "SparkSession\nfrom pyspark.rdd import RDD\nfrom pyspark.sql " \
+                    "import SQLContext, HiveContext, Row\n\nconf = SparkConf(" \
+                    ")\nconf.setMaster(\"local\").setAppName(\"Editor Local " \
+                    "Example\")\nsc = SparkContext(conf=conf)\nsqlContext = " \
+                    "HiveContext(sc)\nspark = SparkSession(sc)\n" \
+                    + context["params"]["textDocument"]["text"]
+            log.info("didOpen:%s", context)
+        elif context["method"] == "textDocument/didChange":
+            if os.path.splitext(context["params"]["textDocument"]["uri"])[-1] == ".py":
+                for range in context["params"]["contentChanges"]:
+                    range['range']['start']['line'] = range['range']['start']['line'] + 11
+                    range['range']['end']['line'] = range['range']['end']['line'] + 11
+            log.info("didChange:%s", context)
+        elif context["method"] == "textDocument/completion":
+            if os.path.splitext(context["params"]["textDocument"]["uri"])[-1] == ".py":
+                context['params']['position']['line'] = context['params']['position']['line'] + 11
+            log.info("completion:%s", context)
+        self.writer.write(context)
 
     def check_origin(self, origin):
         return True
@@ -133,7 +133,7 @@ class LanguageServerWebSocketHandler(websocket.WebSocketHandler):
             log.info("=======after delete map_catch:=======")
             log.info(self.map_catch)
         log.info("==========close-end==============")
-    
+
     def close(self):
         log.info("触发close事件")
 
@@ -148,10 +148,11 @@ class LanguageServerWebSocketHandler(websocket.WebSocketHandler):
     def map_converse(self):
         return {self.cookie: [self.pid]}
 
+
 if __name__ == "__main__":
     timer_task()
     app = web.Application([
         (r"/python", LanguageServerWebSocketHandler),
     ])
     app.listen(3001)
-    ioloop.IOLoop.current().start()                                                               
+    ioloop.IOLoop.current().start()
