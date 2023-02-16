@@ -3,7 +3,6 @@ import logging
 import subprocess
 import threading
 import os
-import signal
 
 from langserver_timer import timer_task
 
@@ -14,7 +13,10 @@ from pylsp_jsonrpc import streams
 from lxpy import copy_headers_dict
 
 log = logging.getLogger(__name__)
-logging.basicConfig(level=logging.DEBUG, format='%(asctime)s %(levelname)-8s %(message)s', datefmt='%a, %d %b %Y %H:%M:%S', filename='/appcom/logs/dssInstall/python-server-out.log', filemode='w')
+logging.basicConfig(level=logging.DEBUG, format='%(asctime)s %(levelname)-8s %(message)s',
+                    datefmt='%a, %d %b %Y %H:%M:%S', filename='/appcom/logs/dssInstall/python-server-out.log',
+                    filemode='w')
+
 
 class LanguageServerWebSocketHandler(websocket.WebSocketHandler):
     """Setup tornado websocket handler to host an external language server."""
@@ -33,7 +35,7 @@ class LanguageServerWebSocketHandler(websocket.WebSocketHandler):
 
         # Create an instance of the language server
         proc = process.Subprocess(
-            ['pylsp', '-vv'],
+            ['./bin/python3', './bin/pylsp', '-vv'],
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE
         )
@@ -133,7 +135,7 @@ class LanguageServerWebSocketHandler(websocket.WebSocketHandler):
             log.info("=======after delete map_catch:=======")
             log.info(self.map_catch)
         log.info("==========close-end==============")
-    
+
     def close(self):
         log.info("触发close事件")
 
@@ -148,10 +150,11 @@ class LanguageServerWebSocketHandler(websocket.WebSocketHandler):
     def map_converse(self):
         return {self.cookie: [self.pid]}
 
+
 if __name__ == "__main__":
     timer_task()
     app = web.Application([
         (r"/python", LanguageServerWebSocketHandler),
     ])
     app.listen(3001)
-    ioloop.IOLoop.current().start()                                                               
+    ioloop.IOLoop.current().start()

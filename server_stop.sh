@@ -17,4 +17,6 @@ for PYLSP_PID in `ps aux | grep pylsp | egrep -v "grep|$base_name" | awk '{print
 done
 
 echo -e "python server is stop"
+echo "..."
+sleep 3s
 
