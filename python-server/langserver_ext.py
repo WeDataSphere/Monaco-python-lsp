@@ -76,7 +76,6 @@ class LanguageServerWebSocketHandler(websocket.WebSocketHandler):
 
     def on_message(self, message):
         """Forward client->server messages to the endpoint."""
-        """ 由于pyls不提供resolve方法，monaco-edit会请求此方法，为了避免服务端报错，故过滤掉此方法 """
         context = json.loads(message)
         if context["method"] == "textDocument/changePage":
             self.on_close()
@@ -108,16 +107,6 @@ class LanguageServerWebSocketHandler(websocket.WebSocketHandler):
     def check_origin(self, origin):
         return True
 
-    def on_connection_close(self) -> None:
-        log.info("触发on_connection_close")
-        if self.ws_connection:
-            self.ws_connection.on_connection_close()
-            self.ws_connection = None
-        if not self._on_close_called:
-            self._on_close_called = True
-            self.on_close()
-            self._break_cycles()
-
     def on_close(self) -> None:
         log.info("=============on_close==============")
         log.info("=========before catch========")
@@ -135,9 +124,6 @@ class LanguageServerWebSocketHandler(websocket.WebSocketHandler):
             log.info("=======after delete map_catch:=======")
             log.info(self.map_catch)
         log.info("==========close-end==============")
-
-    def close(self):
-        log.info("触发close事件")
 
     def absolve_cookie(self):
         header_dict = copy_headers_dict(str(self.request.headers))
