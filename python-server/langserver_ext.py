@@ -3,7 +3,9 @@ import logging
 import subprocess
 import threading
 import os
-
+import requests
+from properties_read import Properties
+from filter_util import filter_list_item1, filter_list_item2
 from langserver_timer import timer_task
 
 from tornado import ioloop, process, web, websocket
@@ -13,6 +15,8 @@ from pylsp_jsonrpc import streams
 from lxpy import copy_headers_dict
 
 log = logging.getLogger(__name__)
+
+
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s %(levelname)-8s %(message)s',
                     datefmt='%a, %d %b %Y %H:%M:%S', filename='/appcom/logs/dssInstall/python-server-out.log',
                     filemode='w')
@@ -26,16 +30,37 @@ class LanguageServerWebSocketHandler(websocket.WebSocketHandler):
 
     def __init__(self, *args, **kwargs):
         log.info("python-server开始初始化：")
+        timer_task()
         super().__init__(*args, **kwargs)
         self.cookie = self.absolve_cookie()
         self.pid = None
+        properties = Properties("../params.properties").getProperties()
+        self.server_address = properties["linkis_server_address"]
+        self.python_python_version = self.get_python_version(
+            self.server_address + "/api/rest_j/v1/configuration/getFullTreesByAppName",
+            {"creator": "IDE", "engineType": "python", "version": "python2"})
+        self.spark_python_version = self.get_python_version(
+            self.server_address + "/api/rest_j/v1/configuration/getFullTreesByAppName",
+            {"creator": "IDE", "engineType": "spark", "version": "2.4.3"})
+
+    def get_python_version(self, url, params):
+        result = requests.get(url, params, cookies={"Cookie": self.cookie})
+        if result.ok and result.json():
+            data = result.json()["data"]["fullTree"]
+            fullTree = list(filter(filter_list_item1, data))[0]
+            default_python_version = list(filter(filter_list_item2, fullTree["settings"]))[0]["defaultValue"]
+            config_python_version = list(filter(filter_list_item2, fullTree["settings"]))[0]["configValue"]
+            python_version = config_python_version if config_python_version != '' else default_python_version
+        else:
+            log.error(result.raise_for_status())
+        return python_version
 
     def open(self, *args, **kwargs):
-        log.info("Spawning pyls subprocess")
+        log.info("Spawning pylsp subprocess")
 
         # Create an instance of the language server
         proc = process.Subprocess(
-            ['./bin/python3', './bin/pylsp', '-vv'],
+            ['pylsp', '-vv'],
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE
         )
@@ -81,6 +106,7 @@ class LanguageServerWebSocketHandler(websocket.WebSocketHandler):
             self.on_close()
         else:
             if context["method"] == "textDocument/didOpen":
+                context["params"]["textDocument"].update({"pythonVersion": self.python_python_version})
                 if os.path.splitext(context["params"]["textDocument"]["uri"])[-1] == ".py":
                     context["params"]["textDocument"]["text"] = \
                         "from pyspark.conf import SparkConf\nfrom pyspark.context " \
@@ -91,16 +117,21 @@ class LanguageServerWebSocketHandler(websocket.WebSocketHandler):
                         "Example\")\nsc = SparkContext(conf=conf)\nsqlContext = " \
                         "HiveContext(sc)\nspark = SparkSession(sc)\n" \
                         + context["params"]["textDocument"]["text"]
+                    context["params"]["textDocument"]["pythonVersion"] = self.spark_python_version
                 log.info("didOpen:%s", context)
             elif context["method"] == "textDocument/didChange":
+                context["params"]["textDocument"].update({"pythonVersion": self.python_python_version})
                 if os.path.splitext(context["params"]["textDocument"]["uri"])[-1] == ".py":
                     for range in context["params"]["contentChanges"]:
                         range['range']['start']['line'] = range['range']['start']['line'] + 11
                         range['range']['end']['line'] = range['range']['end']['line'] + 11
+                    context["params"]["textDocument"]["pythonVersion"] = self.spark_python_version
                 log.info("didChange:%s", context)
             elif context["method"] == "textDocument/completion":
+                context["params"]["textDocument"].update({"pythonVersion": self.python_python_version})
                 if os.path.splitext(context["params"]["textDocument"]["uri"])[-1] == ".py":
                     context['params']['position']['line'] = context['params']['position']['line'] + 11
+                    context["params"]["textDocument"]["pythonVersion"] = self.spark_python_version
                 log.info("completion:%s", context)
             self.writer.write(context)
 
@@ -138,7 +169,6 @@ class LanguageServerWebSocketHandler(websocket.WebSocketHandler):
 
 
 if __name__ == "__main__":
-    timer_task()
     app = web.Application([
         (r"/python", LanguageServerWebSocketHandler),
     ])
