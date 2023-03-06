@@ -1,13 +1,12 @@
 import json
-import logging
 import subprocess
 import threading
 import os
-import tornado
 import requests
 from properties_read import Properties
 from filter_util import filter_list_item1, filter_list_item2
 from langserver_timer import timer_task
+from logging_config import GetLog
 
 from tornado import ioloop, process, web, websocket
 
@@ -15,12 +14,7 @@ from pylsp_jsonrpc import streams
 
 from lxpy import copy_headers_dict
 
-log = logging.getLogger(__name__)
-
-
-logging.basicConfig(level=logging.DEBUG, format='%(asctime)s %(levelname)-8s %(message)s',
-                    datefmt='%a, %d %b %Y %H:%M:%S', filename='/appcom/logs/dssInstall/python-server-out.log',
-                    filemode='w')
+log = GetLog(os.path.basename(__file__)).get_log()
 
 
 class LanguageServerWebSocketHandler(websocket.WebSocketHandler):

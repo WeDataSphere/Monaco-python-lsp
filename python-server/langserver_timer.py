@@ -2,10 +2,10 @@ import datetime
 import threading
 import subprocess
 import os
-import logging
+from logging_config import GetLog
 
-log = logging.getLogger(__name__)
-logging.basicConfig(level=logging.DEBUG, format='%(asctime)s %(levelname)-8s %(message)s', datefmt='%a, %d %b %Y %H:%M:%S', filename='/appcom/logs/dssInstall/python-server-out.log', filemode='w')
+log = GetLog(os.path.basename(__file__)).get_log()
+
 
 def func():
     """凌晨1点开启任务"""
