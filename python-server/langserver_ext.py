@@ -102,7 +102,7 @@ class LanguageServerWebSocketHandler(websocket.WebSocketHandler):
                 context["params"]["textDocument"].update({"pythonVersion": self.python_python_version})
                 if os.path.splitext(context["params"]["textDocument"]["uri"])[-1] == ".py":
                     context["params"]["textDocument"]["text"] = \
-                        "from pyspark.conf import SparkConf\nfrom pyspark.context " \
+                        "from pylsp.mix_pyspark import show\nfrom pyspark.conf import SparkConf\nfrom pyspark.context " \
                         "import SparkContext\nfrom pyspark.sql.session import " \
                         "SparkSession\nfrom pyspark.rdd import RDD\nfrom pyspark.sql " \
                         "import SQLContext, HiveContext, Row\n\nconf = SparkConf(" \
@@ -116,14 +116,14 @@ class LanguageServerWebSocketHandler(websocket.WebSocketHandler):
                 context["params"]["textDocument"].update({"pythonVersion": self.python_python_version})
                 if os.path.splitext(context["params"]["textDocument"]["uri"])[-1] == ".py":
                     for range in context["params"]["contentChanges"]:
-                        range['range']['start']['line'] = range['range']['start']['line'] + 11
-                        range['range']['end']['line'] = range['range']['end']['line'] + 11
+                        range['range']['start']['line'] = range['range']['start']['line'] + 12
+                        range['range']['end']['line'] = range['range']['end']['line'] + 12
                     context["params"]["textDocument"]["pythonVersion"] = self.spark_python_version
                 log.info("didChange:%s", context)
             elif context["method"] == "textDocument/completion":
                 context["params"]["textDocument"].update({"pythonVersion": self.python_python_version})
                 if os.path.splitext(context["params"]["textDocument"]["uri"])[-1] == ".py":
-                    context['params']['position']['line'] = context['params']['position']['line'] + 11
+                    context['params']['position']['line'] = context['params']['position']['line'] + 12
                     context["params"]["textDocument"]["pythonVersion"] = self.spark_python_version
                 log.info("completion:%s", context)
             self.writer.write(context)
