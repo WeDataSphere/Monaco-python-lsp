@@ -4,7 +4,7 @@ import threading
 import os
 import requests
 from properties_read import Properties
-from filter_util import filter_list_item1, filter_list_item2
+from filter_util import filter_list_item1, filter_list_item2, read_file
 from langserver_timer import timer_task
 from logging_config import GetLog
 
@@ -28,6 +28,7 @@ class LanguageServerWebSocketHandler(websocket.WebSocketHandler):
         super().__init__(*args, **kwargs)
         self.cookie = self.absolve_cookie()
         self.pid = None
+        # 读取配置文件
         properties = Properties("params.properties").getProperties()
         self.server_address = properties["linkis_server_address"]
         self.python_python_version = self.get_python_version(
@@ -36,7 +37,14 @@ class LanguageServerWebSocketHandler(websocket.WebSocketHandler):
         self.spark_python_version = self.get_python_version(
             self.server_address + "/api/rest_j/v1/configuration/getFullTreesByAppName",
             {"creator": "IDE", "engineType": "spark", "version": "2.4.3"})
+        # 读取python spark预编译文件
+        result = read_file('../ext-module/preCompile/python_spark.py')
+        log.info("read file result: %s", result)
+        self.pre_line = result['num_lines']
+        self.pre_content = result['content']
+        self.line_import = result['num_imports']
 
+    # 解析python_version
     def get_python_version(self, url, params):
         log.debug("get_python_version cookie:%s",self.cookie)
         result = requests.get(url, params, headers={"Cookie": self.cookie})
@@ -45,7 +53,7 @@ class LanguageServerWebSocketHandler(websocket.WebSocketHandler):
             fullTree = list(filter(filter_list_item1, data))[0]
             python_version = list(filter(filter_list_item2, fullTree["settings"]))[0]["configValue"]
         else:
-            log.error(result.raise_for_status())
+            log.error("call linkis error: %s ", result.raise_for_status())
         return python_version
 
     def open(self, *args, **kwargs):
@@ -96,36 +104,33 @@ class LanguageServerWebSocketHandler(websocket.WebSocketHandler):
         """Forward client->server messages to the endpoint."""
         context = json.loads(message)
         if context["method"] == "textDocument/changePage":
+            log.info("cookie %s call method changePage, pylsp process will be kill", self.cookie)
             self.on_close()
         else:
             if context["method"] == "textDocument/didOpen":
                 context["params"]["textDocument"].update({"pythonVersion": self.python_python_version})
                 if os.path.splitext(context["params"]["textDocument"]["uri"])[-1] == ".py":
-                    context["params"]["textDocument"]["text"] = \
-                        "from pylsp.mix_pyspark import show\nfrom pyspark.conf import SparkConf\nfrom pyspark.context " \
-                        "import SparkContext\nfrom pyspark.sql.session import " \
-                        "SparkSession\nfrom pyspark.rdd import RDD\nfrom pyspark.sql " \
-                        "import SQLContext, HiveContext, Row\n\nconf = SparkConf(" \
-                        ")\nconf.setMaster(\"local\").setAppName(\"Editor Local " \
-                        "Example\")\nsc = SparkContext(conf=conf)\nsqlContext = " \
-                        "HiveContext(sc)\nspark = SparkSession(sc)\n" \
-                        + context["params"]["textDocument"]["text"]
+                    context["params"]["textDocument"]["text"] = self.pre_content + context["params"]["textDocument"]["text"]
                     context["params"]["textDocument"]["pythonVersion"] = self.spark_python_version
-                log.info("didOpen:%s", context)
+                    context["params"]["textDocument"]["preLine"] = self.pre_line
+                    context["params"]["textDocument"]["importLine"] = self.line_import
+                log.info("request didOpen contest:%s", context)
             elif context["method"] == "textDocument/didChange":
                 context["params"]["textDocument"].update({"pythonVersion": self.python_python_version})
                 if os.path.splitext(context["params"]["textDocument"]["uri"])[-1] == ".py":
                     for range in context["params"]["contentChanges"]:
-                        range['range']['start']['line'] = range['range']['start']['line'] + 12
-                        range['range']['end']['line'] = range['range']['end']['line'] + 12
+                        range['range']['start']['line'] = range['range']['start']['line'] + self.pre_line
+                        range['range']['end']['line'] = range['range']['end']['line'] + self.pre_line
                     context["params"]["textDocument"]["pythonVersion"] = self.spark_python_version
-                log.info("didChange:%s", context)
+                    context["params"]["textDocument"]["preLine"] = self.pre_line
+                    context["params"]["textDocument"]["importLine"] = self.line_import
+                log.info("request didChange context:%s", context)
             elif context["method"] == "textDocument/completion":
                 context["params"]["textDocument"].update({"pythonVersion": self.python_python_version})
                 if os.path.splitext(context["params"]["textDocument"]["uri"])[-1] == ".py":
-                    context['params']['position']['line'] = context['params']['position']['line'] + 12
+                    context['params']['position']['line'] = context['params']['position']['line'] + self.pre_line
                     context["params"]["textDocument"]["pythonVersion"] = self.spark_python_version
-                log.info("completion:%s", context)
+                log.info("request completion context:%s", context)
             self.writer.write(context)
 
     def check_origin(self, origin):
@@ -134,7 +139,7 @@ class LanguageServerWebSocketHandler(websocket.WebSocketHandler):
     def on_close(self) -> None:
         log.info("=============on_close==============")
         log.info("=========before catch========")
-        log.info(self.map_catch)
+        log.info("before on_close map_catch:%s ", self.map_catch)
         if self.map_catch != {}:
             for pid in self.map_catch[self.cookie]:
                 try:
@@ -146,7 +151,7 @@ class LanguageServerWebSocketHandler(websocket.WebSocketHandler):
                     log.error(err)
             del self.map_catch[self.cookie]
             log.info("=======after delete map_catch:=======")
-            log.info(self.map_catch)
+            log.info("after kill pylsp process map_catch: %s", self.map_catch)
         log.info("==========close-end==============")
 
     def absolve_cookie(self):
