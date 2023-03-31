@@ -22,6 +22,7 @@ class LanguageServerWebSocketHandler(websocket.WebSocketHandler):
     log.info("=========LanguageServerWebSocketHandler=======")
     writer = None
     map_catch = {}
+    result = read_file('./python-server/pre-import/pre_compile_Import.py')
 
     def __init__(self, *args, **kwargs):
         log.info("python-server开始初始化：")
@@ -38,15 +39,13 @@ class LanguageServerWebSocketHandler(websocket.WebSocketHandler):
             self.server_address + "/api/rest_j/v1/configuration/getFullTreesByAppName",
             {"creator": "IDE", "engineType": "spark", "version": "2.4.3"})
         # 读取python spark预编译文件
-        result = read_file('../ext-module/preCompile/python_spark.py')
-        log.info("read file result: %s", result)
-        self.pre_line = result['num_lines']
-        self.pre_content = result['content']
-        self.line_import = result['num_imports']
+        self.pre_line = LanguageServerWebSocketHandler.result['num_lines']
+        self.pre_content = LanguageServerWebSocketHandler.result['content']
+        log.info("read file result: %s", LanguageServerWebSocketHandler.result)
 
     # 解析python_version
     def get_python_version(self, url, params):
-        log.debug("get_python_version cookie:%s",self.cookie)
+        log.debug("get_python_version cookie:%s", self.cookie)
         result = requests.get(url, params, headers={"Cookie": self.cookie})
         if result.ok and result.json():
             data = result.json()["data"]["fullTree"]
@@ -108,29 +107,22 @@ class LanguageServerWebSocketHandler(websocket.WebSocketHandler):
             self.on_close()
         else:
             if context["method"] == "textDocument/didOpen":
+                context["params"]["textDocument"]["text"] = self.pre_content + context["params"]["textDocument"][
+                    "text"]
+                context["params"]["textDocument"]["preLine"] = self.pre_line
                 context["params"]["textDocument"].update({"pythonVersion": self.python_python_version})
-                if os.path.splitext(context["params"]["textDocument"]["uri"])[-1] == ".py":
-                    context["params"]["textDocument"]["text"] = self.pre_content + context["params"]["textDocument"]["text"]
-                    context["params"]["textDocument"]["pythonVersion"] = self.spark_python_version
-                    context["params"]["textDocument"]["preLine"] = self.pre_line
-                    context["params"]["textDocument"]["importLine"] = self.line_import
-                log.info("request didOpen contest:%s", context)
+                log.info("request method didOpen:%s", context)
             elif context["method"] == "textDocument/didChange":
+                for range in context["params"]["contentChanges"]:
+                    range['range']['start']['line'] = range['range']['start']['line'] + self.pre_line
+                    range['range']['end']['line'] = range['range']['end']['line'] + self.pre_line
+                context["params"]["textDocument"]["preLine"] = self.pre_line
                 context["params"]["textDocument"].update({"pythonVersion": self.python_python_version})
-                if os.path.splitext(context["params"]["textDocument"]["uri"])[-1] == ".py":
-                    for range in context["params"]["contentChanges"]:
-                        range['range']['start']['line'] = range['range']['start']['line'] + self.pre_line
-                        range['range']['end']['line'] = range['range']['end']['line'] + self.pre_line
-                    context["params"]["textDocument"]["pythonVersion"] = self.spark_python_version
-                    context["params"]["textDocument"]["preLine"] = self.pre_line
-                    context["params"]["textDocument"]["importLine"] = self.line_import
-                log.info("request didChange context:%s", context)
+                log.info("request method didChange:%s", context)
             elif context["method"] == "textDocument/completion":
+                context['params']['position']['line'] = context['params']['position']['line'] + self.pre_line
                 context["params"]["textDocument"].update({"pythonVersion": self.python_python_version})
-                if os.path.splitext(context["params"]["textDocument"]["uri"])[-1] == ".py":
-                    context['params']['position']['line'] = context['params']['position']['line'] + self.pre_line
-                    context["params"]["textDocument"]["pythonVersion"] = self.spark_python_version
-                log.info("request completion context:%s", context)
+            log.info("request method completion:%s", context)
             self.writer.write(context)
 
     def check_origin(self, origin):
