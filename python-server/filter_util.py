@@ -20,6 +20,3 @@ def read_file(file_path):
         content = ''.join(content_lines)
         result = {'content': content, 'num_lines': num_lines}
         return result
-
-if __name__ == '__main__':
-    print(read_file("pre-import/pre_compile_Import.py"))

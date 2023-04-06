@@ -22,7 +22,8 @@ class LanguageServerWebSocketHandler(websocket.WebSocketHandler):
     log.info("=========LanguageServerWebSocketHandler=======")
     writer = None
     map_catch = {}
-    result = read_file('./python-server/pre-import/pre_compile_Import.py')
+    py_content = read_file('./python-server/pre-import/pre_compile_py.py')
+    python_content = read_file('./python-server/pre-import/pre_compile_python.py')
 
     def __init__(self, *args, **kwargs):
         log.info("python-server开始初始化：")
@@ -35,13 +36,17 @@ class LanguageServerWebSocketHandler(websocket.WebSocketHandler):
         self.python_python_version = self.get_python_version(
             self.server_address + "/api/rest_j/v1/configuration/getFullTreesByAppName",
             {"creator": "IDE", "engineType": "python", "version": "python2"})
+        log.info()
         self.spark_python_version = self.get_python_version(
             self.server_address + "/api/rest_j/v1/configuration/getFullTreesByAppName",
             {"creator": "IDE", "engineType": "spark", "version": "2.4.3"})
         # 读取python spark预编译文件
-        self.pre_line = LanguageServerWebSocketHandler.result['num_lines']
-        self.pre_content = LanguageServerWebSocketHandler.result['content']
-        log.info("read file result: %s", LanguageServerWebSocketHandler.result)
+        self.py_pre_line = LanguageServerWebSocketHandler.py_content['num_lines']
+        self.py_pre_content = LanguageServerWebSocketHandler.py_content['content']
+        log.info("read py pre-compile file result: %s", LanguageServerWebSocketHandler.py_content)
+        self.python_pre_line = LanguageServerWebSocketHandler.python_content['num_lines']
+        self.python_pre_content = LanguageServerWebSocketHandler.python_content['content']
+        log.info("read python pre-compile file result: %s", LanguageServerWebSocketHandler.python_content)
 
     # 解析python_version
     def get_python_version(self, url, params):
@@ -50,7 +55,11 @@ class LanguageServerWebSocketHandler(websocket.WebSocketHandler):
         if result.ok and result.json():
             data = result.json()["data"]["fullTree"]
             fullTree = list(filter(filter_list_item1, data))[0]
-            python_version = list(filter(filter_list_item2, fullTree["settings"]))[0]["configValue"]
+            config_python_version = list(filter(filter_list_item2, fullTree["settings"]))[0]["configValue"]
+            default_python_version = list(filter(filter_list_item2, fullTree["settings"]))[0]["defaultValue"]
+            python_version = config_python_version if config_python_version != '' else default_python_version
+            log.info("default_python_version: %s, config_python_version: %s", default_python_version,
+                     config_python_version)
         else:
             log.error("call linkis error: %s ", result.raise_for_status())
         return python_version
@@ -107,21 +116,35 @@ class LanguageServerWebSocketHandler(websocket.WebSocketHandler):
             self.on_close()
         else:
             if context["method"] == "textDocument/didOpen":
-                context["params"]["textDocument"]["text"] = self.pre_content + context["params"]["textDocument"][
-                    "text"]
-                context["params"]["textDocument"]["preLine"] = self.pre_line
                 context["params"]["textDocument"].update({"pythonVersion": self.python_python_version})
+                if os.path.splitext(context["params"]["textDocument"]["uri"])[-1] == ".py":
+                    context["params"]["textDocument"]["text"] = self.py_pre_content + context["params"]["textDocument"][
+                        "text"]
+                    context["params"]["textDocument"]["preLine"] = self.py_pre_line
+                else:
+                    context["params"]["textDocument"]["text"] = self.python_pre_content + context["params"]["textDocument"][
+                        "text"]
+                    context["params"]["textDocument"]["preLine"] = self.python_pre_line
                 log.info("request method didOpen:%s", context)
             elif context["method"] == "textDocument/didChange":
-                for range in context["params"]["contentChanges"]:
-                    range['range']['start']['line'] = range['range']['start']['line'] + self.pre_line
-                    range['range']['end']['line'] = range['range']['end']['line'] + self.pre_line
-                context["params"]["textDocument"]["preLine"] = self.pre_line
                 context["params"]["textDocument"].update({"pythonVersion": self.python_python_version})
+                if os.path.splitext(context["params"]["textDocument"]["uri"])[-1] == ".py":
+                    for range in context["params"]["contentChanges"]:
+                        range['range']['start']['line'] = range['range']['start']['line'] + self.py_pre_line
+                        range['range']['end']['line'] = range['range']['end']['line'] + self.py_pre_line
+                    context["params"]["textDocument"]["preLine"] = self.py_pre_line
+                else:
+                    for range in context["params"]["contentChanges"]:
+                        range['range']['start']['line'] = range['range']['start']['line'] + self.python_pre_line
+                        range['range']['end']['line'] = range['range']['end']['line'] + self.python_pre_line
+                    context["params"]["textDocument"]["preLine"] = self.python_pre_line
                 log.info("request method didChange:%s", context)
             elif context["method"] == "textDocument/completion":
-                context['params']['position']['line'] = context['params']['position']['line'] + self.pre_line
                 context["params"]["textDocument"].update({"pythonVersion": self.python_python_version})
+                if os.path.splitext(context["params"]["textDocument"]["uri"])[-1] == ".py":
+                    context['params']['position']['line'] = context['params']['position']['line'] + self.py_pre_line
+                else:
+                    context['params']['position']['line'] = context['params']['position']['line'] + self.python_pre_line
             log.info("request method completion:%s", context)
             self.writer.write(context)
 
