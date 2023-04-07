@@ -36,7 +36,6 @@ class LanguageServerWebSocketHandler(websocket.WebSocketHandler):
         self.python_python_version = self.get_python_version(
             self.server_address + "/api/rest_j/v1/configuration/getFullTreesByAppName",
             {"creator": "IDE", "engineType": "python", "version": "python2"})
-        log.info()
         self.spark_python_version = self.get_python_version(
             self.server_address + "/api/rest_j/v1/configuration/getFullTreesByAppName",
             {"creator": "IDE", "engineType": "spark", "version": "2.4.3"})
@@ -53,6 +52,7 @@ class LanguageServerWebSocketHandler(websocket.WebSocketHandler):
         log.debug("get_python_version cookie:%s", self.cookie)
         result = requests.get(url, params, headers={"Cookie": self.cookie})
         if result.ok and result.json():
+            log.info("get_python_version request url: %s", result.url)
             data = result.json()["data"]["fullTree"]
             fullTree = list(filter(filter_list_item1, data))[0]
             config_python_version = list(filter(filter_list_item2, fullTree["settings"]))[0]["configValue"]
@@ -62,6 +62,7 @@ class LanguageServerWebSocketHandler(websocket.WebSocketHandler):
                      config_python_version)
         else:
             log.error("call linkis error: %s ", result.raise_for_status())
+        log.info("call url get python_version is %s", python_version)
         return python_version
 
     def open(self, *args, **kwargs):
