@@ -22,8 +22,8 @@ class LanguageServerWebSocketHandler(websocket.WebSocketHandler):
     log.info("=========LanguageServerWebSocketHandler=======")
     writer = None
     map_catch = {}
-    py_content = read_file('./python-server/pre-import/pre_compile_py.py')
-    python_content = read_file('./python-server/pre-import/pre_compile_python.py')
+    py_content = read_file('./pre-import/pre_compile_py.py')
+    python_content = read_file('./pre-import/pre_compile_python.py')
 
     def __init__(self, *args, **kwargs):
         log.info("python-server开始初始化：")
