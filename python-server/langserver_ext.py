@@ -182,9 +182,9 @@ class LanguageServerWebSocketHandler(websocket.WebSocketHandler):
 
 
 if __name__ == "__main__":
-    timer_task()
     # 读取配置文件
     config = Properties("params.properties").getProperties()
+    timer_task(config.get("execute_time"))
     app = web.Application([
         (r"/python", LanguageServerWebSocketHandler, {"config": config}),
     ])
