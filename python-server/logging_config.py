@@ -1,5 +1,7 @@
 import logging
 import os
+from logging.handlers import RotatingFileHandler
+
 from properties_read import Properties
 
 
@@ -19,7 +21,7 @@ class GetLog(object):
         if not logger.handlers:
             # 初始化handler
             stream_handler = logging.StreamHandler()
-            file_handler = logging.FileHandler(filename=self.filename)
+            file_handler = RotatingFileHandler(filename=self.filename, maxBytes=1024*1024*100, backupCount=5)
 
             # 设置handler等级
             stream_handler.setLevel(level=self.level)

@@ -27,12 +27,11 @@ class LanguageServerWebSocketHandler(websocket.WebSocketHandler):
 
     def __init__(self, *args, **kwargs):
         log.info("python-server开始初始化：")
+        self.server_address = kwargs.pop("config").get("linkis_server_address")
         super().__init__(*args, **kwargs)
         self.cookie = self.absolve_cookie()
         self.pid = None
         # 读取配置文件
-        properties = Properties("params.properties").getProperties()
-        self.server_address = properties["linkis_server_address"]
         self.python_python_version = self.get_python_version(
             self.server_address + "/api/rest_j/v1/configuration/getFullTreesByAppName",
             {"creator": "IDE", "engineType": "python", "version": "python2"})
@@ -184,8 +183,10 @@ class LanguageServerWebSocketHandler(websocket.WebSocketHandler):
 
 if __name__ == "__main__":
     timer_task()
+    # 读取配置文件
+    config = Properties("params.properties").getProperties()
     app = web.Application([
-        (r"/python", LanguageServerWebSocketHandler),
+        (r"/python", LanguageServerWebSocketHandler, {"config": config}),
     ])
-    app.listen(3001)
+    app.listen(config.get("port"))
     ioloop.IOLoop.current().start()
