@@ -22,8 +22,8 @@ class LanguageServerWebSocketHandler(websocket.WebSocketHandler):
     log.info("=========LanguageServerWebSocketHandler=======")
     writer = None
     map_catch = {}
-    py_content = read_file('./pre-import/pre_compile_py.py')
-    python_content = read_file('./pre-import/pre_compile_python.py')
+    py_content = read_file('./python-server/pre-import/pre_compile_py.py')
+    python_content = read_file('./python-server/pre-import/pre_compile_python.py')
 
     def __init__(self, *args, **kwargs):
         log.info("python-server开始初始化：")
@@ -188,5 +188,5 @@ if __name__ == "__main__":
     app = web.Application([
         (r"/python", LanguageServerWebSocketHandler, {"config": config}),
     ])
-    app.listen(config.get("port"))
+    app.listen(config.get("server_port"))
     ioloop.IOLoop.current().start()
