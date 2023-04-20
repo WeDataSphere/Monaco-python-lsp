@@ -116,35 +116,38 @@ class LanguageServerWebSocketHandler(websocket.WebSocketHandler):
             self.on_close()
         else:
             if context["method"] == "textDocument/didOpen":
-                context["params"]["textDocument"].update({"pythonVersion": self.python_python_version})
                 if os.path.splitext(context["params"]["textDocument"]["uri"])[-1] == ".py":
                     context["params"]["textDocument"]["text"] = self.py_pre_content + context["params"]["textDocument"][
                         "text"]
                     context["params"]["textDocument"]["preLine"] = self.py_pre_line
+                    context["params"]["textDocument"].update({"pythonVersion": self.spark_python_version})
                 else:
                     context["params"]["textDocument"]["text"] = self.python_pre_content + context["params"]["textDocument"][
                         "text"]
                     context["params"]["textDocument"]["preLine"] = self.python_pre_line
+                    context["params"]["textDocument"].update({"pythonVersion": self.python_python_version})
                 log.info("request method didOpen:%s", context)
             elif context["method"] == "textDocument/didChange":
-                context["params"]["textDocument"].update({"pythonVersion": self.python_python_version})
                 if os.path.splitext(context["params"]["textDocument"]["uri"])[-1] == ".py":
                     for range in context["params"]["contentChanges"]:
                         range['range']['start']['line'] = range['range']['start']['line'] + self.py_pre_line
                         range['range']['end']['line'] = range['range']['end']['line'] + self.py_pre_line
                     context["params"]["textDocument"]["preLine"] = self.py_pre_line
+                    context["params"]["textDocument"].update({"pythonVersion": self.spark_python_version})
                 else:
                     for range in context["params"]["contentChanges"]:
                         range['range']['start']['line'] = range['range']['start']['line'] + self.python_pre_line
                         range['range']['end']['line'] = range['range']['end']['line'] + self.python_pre_line
                     context["params"]["textDocument"]["preLine"] = self.python_pre_line
+                    context["params"]["textDocument"].update({"pythonVersion": self.python_python_version})
                 log.info("request method didChange:%s", context)
             elif context["method"] == "textDocument/completion":
-                context["params"]["textDocument"].update({"pythonVersion": self.python_python_version})
                 if os.path.splitext(context["params"]["textDocument"]["uri"])[-1] == ".py":
                     context['params']['position']['line'] = context['params']['position']['line'] + self.py_pre_line
+                    context["params"]["textDocument"].update({"pythonVersion": self.spark_python_version})
                 else:
                     context['params']['position']['line'] = context['params']['position']['line'] + self.python_pre_line
+                    context["params"]["textDocument"].update({"pythonVersion": self.python_python_version})
             log.info("request method completion:%s", context)
             self.writer.write(context)
 
