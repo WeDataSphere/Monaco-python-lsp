@@ -28,6 +28,7 @@ function run(){
     fi
 
     echo "begin to start server..."
+    # 标准输出重定向到/dev/null，标准错误输出重定向到log_file日志文件中
     nohup ./bin/python3 -u ./python-server/langserver_ext.py > /dev/null 2> "${log_file}" &
     sleep 3s
     echo "python server start finished!"

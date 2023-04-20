@@ -15,6 +15,7 @@ for SERVER_PID in $(netstat -nlp | grep :"${server_port}" | awk '{print $7}' | a
 done
 
 cur_pid=$$
+# shellcheck disable=SC2128
 base_name=$(basename "$BASH_SOURCE")
 echo -e "check pylsp process"
 # shellcheck disable=SC2006
