@@ -3,6 +3,9 @@ import subprocess
 import threading
 import os
 import requests
+import tornado
+from typing import Union, Dict, Any
+from tornado.websocket import WebSocketClosedError
 from properties_read import Properties
 from filter_util import filter_list_item1, filter_list_item2, read_file
 from langserver_timer import timer_task
@@ -111,6 +114,18 @@ class LanguageServerWebSocketHandler(websocket.WebSocketHandler):
         thread.daemon = True
         thread.start()
 
+    def write_message(
+            self, message: Union[bytes, str, Dict[str, Any]], binary: bool = False):
+        context = json.loads(message)
+        if self.ws_connection is None or self.ws_connection.is_closing():
+            raise WebSocketClosedError()
+        if "method" in context and context["method"] == "textDocument/publishDiagnostics":
+            context.update({"message": self.message})
+            message = json.dumps(context)
+        if isinstance(message, dict):
+            message = tornado.escape.json_encode(message)
+        return self.ws_connection.write_message(message, binary=binary)
+
     def on_message(self, message):
         """Forward client->server messages to the endpoint."""
         context = json.loads(message)
@@ -129,7 +144,7 @@ class LanguageServerWebSocketHandler(websocket.WebSocketHandler):
                         "text"]
                     context["params"]["textDocument"]["preLine"] = self.python_pre_line
                     context["params"]["textDocument"].update({"pythonVersion": self.python_python_version})
-                self.message = context["params"]["textDocument"]["pythonVersion"]
+                self.message = "current python version is {}".format(context["params"]["textDocument"]["pythonVersion"])
                 log.info("request method didOpen:%s", context)
             elif context["method"] == "textDocument/didChange":
                 if os.path.splitext(context["params"]["textDocument"]["uri"])[-1] == ".py":
@@ -144,7 +159,7 @@ class LanguageServerWebSocketHandler(websocket.WebSocketHandler):
                         range['range']['end']['line'] = range['range']['end']['line'] + self.python_pre_line
                     context["params"]["textDocument"]["preLine"] = self.python_pre_line
                     context["params"]["textDocument"].update({"pythonVersion": self.python_python_version})
-                self.message = context["params"]["textDocument"]["pythonVersion"]
+                self.message = "current python version is {}".format(context["params"]["textDocument"]["pythonVersion"])
                 log.info("request method didChange:%s", context)
             elif context["method"] == "textDocument/completion":
                 if os.path.splitext(context["params"]["textDocument"]["uri"])[-1] == ".py":
@@ -153,7 +168,7 @@ class LanguageServerWebSocketHandler(websocket.WebSocketHandler):
                 else:
                     context['params']['position']['line'] = context['params']['position']['line'] + self.python_pre_line
                     context["params"]["textDocument"].update({"pythonVersion": self.python_python_version})
-                self.message = context["params"]["textDocument"]["pythonVersion"]
+                self.message = "current python version is {}".format(context["params"]["textDocument"]["pythonVersion"])
             log.info("request method completion:%s", context)
             self.writer.write(context)
 
