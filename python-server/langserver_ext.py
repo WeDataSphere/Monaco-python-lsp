@@ -31,6 +31,7 @@ class LanguageServerWebSocketHandler(websocket.WebSocketHandler):
         super().__init__(*args, **kwargs)
         self.cookie = self.absolve_cookie()
         self.pid = None
+        self.message = None
         # 读取配置文件
         self.python_python_version = self.get_python_version(
             self.server_address + "/api/rest_j/v1/configuration/getFullTreesByAppName",
@@ -50,6 +51,7 @@ class LanguageServerWebSocketHandler(websocket.WebSocketHandler):
     def get_python_version(self, url, params):
         log.debug("get_python_version cookie:%s", self.cookie)
         result = requests.get(url, params, headers={"Cookie": self.cookie})
+        python_version = "python2"
         if result.ok and result.json():
             log.info("get_python_version request url: %s", result.url)
             data = result.json()["data"]["fullTree"]
@@ -60,7 +62,8 @@ class LanguageServerWebSocketHandler(websocket.WebSocketHandler):
             log.info("default_python_version: %s, config_python_version: %s", default_python_version,
                      config_python_version)
         else:
-            log.error("call linkis error: %s ", result.raise_for_status())
+            self.message = json.loads(result.text)["message"]
+            log.error("call linkis error: %s ", self.message)
         log.info("call url get python_version is %s", python_version)
         return python_version
 
@@ -126,6 +129,7 @@ class LanguageServerWebSocketHandler(websocket.WebSocketHandler):
                         "text"]
                     context["params"]["textDocument"]["preLine"] = self.python_pre_line
                     context["params"]["textDocument"].update({"pythonVersion": self.python_python_version})
+                self.message = context["params"]["textDocument"]["pythonVersion"]
                 log.info("request method didOpen:%s", context)
             elif context["method"] == "textDocument/didChange":
                 if os.path.splitext(context["params"]["textDocument"]["uri"])[-1] == ".py":
@@ -140,6 +144,7 @@ class LanguageServerWebSocketHandler(websocket.WebSocketHandler):
                         range['range']['end']['line'] = range['range']['end']['line'] + self.python_pre_line
                     context["params"]["textDocument"]["preLine"] = self.python_pre_line
                     context["params"]["textDocument"].update({"pythonVersion": self.python_python_version})
+                self.message = context["params"]["textDocument"]["pythonVersion"]
                 log.info("request method didChange:%s", context)
             elif context["method"] == "textDocument/completion":
                 if os.path.splitext(context["params"]["textDocument"]["uri"])[-1] == ".py":
@@ -148,6 +153,7 @@ class LanguageServerWebSocketHandler(websocket.WebSocketHandler):
                 else:
                     context['params']['position']['line'] = context['params']['position']['line'] + self.python_pre_line
                     context["params"]["textDocument"].update({"pythonVersion": self.python_python_version})
+                self.message = context["params"]["textDocument"]["pythonVersion"]
             log.info("request method completion:%s", context)
             self.writer.write(context)
 
