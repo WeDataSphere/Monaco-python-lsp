@@ -25,9 +25,10 @@ class GetLog(object):
         if not logger.handlers:
             # 初始化handler
             stream_handler = logging.StreamHandler()
+            log_date = datetime.datetime.now().strftime('%m%d')
             # 按照日期切割日志文件
             timed_handler = TimedRotatingFileHandler(
-                filename=os.path.join(self.log_dir, 'python-server-out-' + datetime.datetime.now().strftime('%m%d') + '.log'),
+                filename=os.path.join(self.log_dir, 'python-server-out-' + log_date + '.log'),
                 when='midnight',
                 backupCount=30,
                 encoding='utf-8'
