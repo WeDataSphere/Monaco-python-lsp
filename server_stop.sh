@@ -2,12 +2,17 @@
 
 # 读取配置文件
 config=$(cat params.properties)
+echo "config file: ${config}"
 
 # 解析 JSON 数据
 server_port=$(echo "${config}" | grep "^server_port=" | cut -d'=' -f2)
 
 echo -e "python server will be stopped"
 echo -e "kill server port ${server_port}"
+if [ -z ${server_port} ]; then
+   echo -e "server port is empty, server will exit"
+   exit 1
+fi
 for SERVER_PID in $(netstat -nlp | grep :"${server_port}" | awk '{print $7}' | awk -F'/' '{print $1}' | sort -u);
   do
     echo "language server process id: ${SERVER_PID}";

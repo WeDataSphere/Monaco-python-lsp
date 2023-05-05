@@ -10,7 +10,6 @@ class GetLog(object):
     def __init__(self, logger_name):
         self.name = logger_name
         self.level = logging.DEBUG
-        self.log_date = datetime.datetime.now().strftime('%m%d')
         properties = Properties("params.properties").getProperties()
         self.filename = properties["log_path"]
         self.log_dir = os.path.join(os.path.dirname(self.filename), datetime.datetime.now().strftime('%Y-%m'))
@@ -28,8 +27,9 @@ class GetLog(object):
             stream_handler = logging.StreamHandler()
             # 按照日期切割日志文件
             timed_handler = TimedRotatingFileHandler(
-                filename=os.path.join(self.log_dir, 'python-server-out-' + self.log_date + '.log'),
-                when='midnight',
+                filename=os.path.join(self.log_dir, 'python-server-out.log'),
+                when='M',
+                interval=1,
                 backupCount=30,
                 encoding='utf-8'
             )
