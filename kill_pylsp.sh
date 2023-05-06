@@ -3,6 +3,16 @@
 # 获取指定进程所运行的时间
 function checkProcessRuntime(){
 # name=$1
+base_path=$(cd `dirname "$0"`;pwd)
+cd "${base_path}"
+
+# 读取配置文件
+config=$(cat params.properties)
+log_path=$(echo "${config}" | grep "^log_path=" | cut -d'=' -f2)
+record_path=$(dirname $log_path)/language-server-kill-record.log
+
+current_time=$(date "+%Y.%m.%d-%H:%M:%S")
+
 cur_pid=$$
 sys_uptime=$(cat /proc/uptime | cut -d" " -f1)
 user_hz=$(getconf CLK_TCK)
@@ -17,13 +27,13 @@ do
     up_time=$(cat /proc/$pid/stat | cut -d" " -f22)
     run_time=$((${sys_uptime%.*}-$up_time/$user_hz))
     if [ ${run_time} -ge 7200 ];then
-            echo 'pylsp process pid start more than 2 hours:' $pid
-            kill -9 $pid
-    fi       
+            echo -e "[${current_time}][python-language-server][kill_pylsp] kill pylsp process pid start more than 2 hours process id: ${pid}" |tee -a ${record_path}
+            kill -15 $pid
+    fi
     echo "${pid} ${run_time}"
   fi
 done
- 
+
 }
- 
-checkProcessRuntime 
+
+checkProcessRuntime
