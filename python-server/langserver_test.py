@@ -36,6 +36,7 @@ class LanguageServerWebSocketHandler(websocket.WebSocketHandler):
         self.cookie = self.absolve_cookie()
         self.pid = None
         self.message = None
+        self.content = None
         # 读取配置文件
         self.python_python_version = self.get_python_version(
             self.server_address + "/api/rest_j/v1/configuration/getFullTreesByAppName",
@@ -54,21 +55,26 @@ class LanguageServerWebSocketHandler(websocket.WebSocketHandler):
     # 解析python_version
     def get_python_version(self, url, params):
         log.debug("get_python_version cookie:%s", self.cookie)
-        result = requests.get(url, params, headers={"Cookie": self.cookie})
+        # 默认为python2版本
         python_version = "python2"
-        if result.ok and result.json():
-            log.info("get_python_version request url: %s", result.url)
-            data = result.json()["data"]["fullTree"]
-            fullTree = list(filter(filter_list_item1, data))[0]
-            config_python_version = list(filter(filter_list_item2, fullTree["settings"]))[0]["configValue"]
-            default_python_version = list(filter(filter_list_item2, fullTree["settings"]))[0]["defaultValue"]
-            python_version = config_python_version if config_python_version != '' else default_python_version
-            log.info("default_python_version: %s, config_python_version: %s", default_python_version,
-                     config_python_version)
-        else:
-            self.message = str(json.loads(result.text)["message"]) + ","
-            log.error("call linkis-gateway error: %s ", self.message)
-        log.info("call url get python_version is %s", python_version)
+        try:
+            result = requests.get(url, params, headers={"Cookie": self.cookie})
+            if result.ok and result.json():
+                log.info("get_python_version request url: %s", result.url)
+                data = result.json()["data"]["fullTree"]
+                fullTree = list(filter(filter_list_item1, data))[0]
+                config_python_version = list(filter(filter_list_item2, fullTree["settings"]))[0]["configValue"]
+                default_python_version = list(filter(filter_list_item2, fullTree["settings"]))[0]["defaultValue"]
+                python_version = config_python_version if config_python_version != '' else default_python_version
+                log.info("default_python_version: %s, config_python_version: %s", default_python_version,
+                         config_python_version)
+            else:
+                self.message = str(json.loads(result.text)["message"]) + ","
+                log.error("call linkis-gateway error: %s ", self.message)
+            log.info("call url get python_version is %s", python_version)
+        except Exception as e:
+            log.error("get python version error: %s", e)
+            self.message = e + ","
         return python_version
 
     def open(self, *args, **kwargs):
@@ -121,7 +127,7 @@ class LanguageServerWebSocketHandler(websocket.WebSocketHandler):
         if self.ws_connection is None or self.ws_connection.is_closing():
             raise WebSocketClosedError()
         if "method" in context and context["method"] == "textDocument/publishDiagnostics":
-            context.update({"message": self.message})
+            context.update({"message": self.content})
             message = json.dumps(context)
         if isinstance(message, dict):
             message = tornado.escape.json_encode(message)
@@ -145,7 +151,7 @@ class LanguageServerWebSocketHandler(websocket.WebSocketHandler):
                         "text"]
                     context["params"]["textDocument"]["preLine"] = self.python_pre_line
                     context["params"]["textDocument"].update({"pythonVersion": self.python_python_version})
-                self.message = "{} current python version is {}".format(self.message or "", context["params"]["textDocument"]["pythonVersion"])
+                self.content = "{} current python version is {}".format(self.message or "", context["params"]["textDocument"]["pythonVersion"])
                 log.info("request method didOpen:%s", context)
             elif context["method"] == "textDocument/didChange":
                 if os.path.splitext(context["params"]["textDocument"]["uri"])[-1] == ".py":
@@ -160,7 +166,7 @@ class LanguageServerWebSocketHandler(websocket.WebSocketHandler):
                         range['range']['end']['line'] = range['range']['end']['line'] + self.python_pre_line
                     context["params"]["textDocument"]["preLine"] = self.python_pre_line
                     context["params"]["textDocument"].update({"pythonVersion": self.python_python_version})
-                self.message = "{} current python version is {}".format(self.message or "", context["params"]["textDocument"]["pythonVersion"])
+                self.content = "{} current python version is {}".format(self.message or "", context["params"]["textDocument"]["pythonVersion"])
                 log.info("request method didChange:%s", context)
             elif context["method"] == "textDocument/completion":
                 if os.path.splitext(context["params"]["textDocument"]["uri"])[-1] == ".py":
@@ -169,7 +175,7 @@ class LanguageServerWebSocketHandler(websocket.WebSocketHandler):
                 else:
                     context['params']['position']['line'] = context['params']['position']['line'] + self.python_pre_line
                     context["params"]["textDocument"].update({"pythonVersion": self.python_python_version})
-                self.message = "{} current python version is {}".format(self.message or "", context["params"]["textDocument"]["pythonVersion"])
+                self.content = "{} current python version is {}".format(self.message or "", context["params"]["textDocument"]["pythonVersion"])
             log.info("request method completion:%s", context)
             self.writer.write(context)
 
@@ -201,7 +207,7 @@ class LanguageServerWebSocketHandler(websocket.WebSocketHandler):
         #     return header_dict['Cookie']
         # else:
         #     return None
-        return 'workspaceId=266; workspaceName=test_zxh_bm; linkis_user_session_ticket_id_v1=ADXpz2nl6CvbU3Uwsltu1jptUvsl97behATVZ8rJVSY'
+        return '__gsas=ID=9b84991b0eeaed20:T=1679886819:S=ALNI_MbwCVXpLeAW2ejeH3GoIhKxvegx4w; WB_LOGIN_TICKET=kNeOdITgLKitefz2LmYK5KidW1686105904U4W2pzF2enbUv7tyG7DQYX4iq; WB_LOGIN_TYPE=um; linkis_user_session_ticket_id_v1=FmzyJmP2DGVHfYSfQEnym4mm+kCj7FQUrJbU767BbLg=; workspaceId=271; workspaceName=test_0412_stacy; dss_user_session_proxy_ticket_id_v1=dGXUTSxtsHeiv2ynMMOHEUCahKpkKgHj'
 
     def map_converse(self):
         return {self.cookie: [self.pid]}
