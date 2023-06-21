@@ -12,12 +12,13 @@ class GetLog(object):
         self.level = logging.DEBUG
         properties = Properties("params.properties").getProperties()
         self.filename = properties["log_path"]
-        self.log_dir = os.path.join(os.path.dirname(self.filename), datetime.datetime.now().strftime('%Y-%m'))
 
     def get_log(self):
+        # 日志存放目录
+        log_dir = os.path.join(os.path.dirname(self.filename), datetime.datetime.now().strftime('%Y-%m'))
         # 检查日志文件夹是否存在，不存在则创建
-        if not os.path.exists(self.log_dir):
-            os.makedirs(self.log_dir)
+        if not os.path.exists(log_dir):
+            os.makedirs(log_dir)
 
         # 设置logger
         logger = logging.getLogger(name=self.name)
@@ -27,7 +28,7 @@ class GetLog(object):
             stream_handler = logging.StreamHandler()
             # 按照日期切割日志文件
             timed_handler = TimedRotatingFileHandler(
-                filename=os.path.join(self.log_dir, 'python-server-out.log'),
+                filename=os.path.join(log_dir, 'python-server-out.log'),
                 when='M',
                 interval=1,
                 backupCount=30,

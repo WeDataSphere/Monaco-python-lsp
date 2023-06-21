@@ -126,7 +126,7 @@ class LanguageServerWebSocketHandler(websocket.WebSocketHandler):
         if self.ws_connection is None or self.ws_connection.is_closing():
             raise WebSocketClosedError()
         if "method" in context and context["method"] == "textDocument/publishDiagnostics":
-            context.update({"message": self.message})
+            context.update({"message": self.content})
             message = json.dumps(context)
         if isinstance(message, dict):
             message = tornado.escape.json_encode(message)
