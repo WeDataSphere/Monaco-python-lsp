@@ -68,12 +68,12 @@ class LanguageServerWebSocketHandler(websocket.WebSocketHandler):
                 log.info("default_python_version: %s, config_python_version: %s", default_python_version,
                          config_python_version)
             else:
-                self.message = str(json.loads(result.text)["message"]) + ","
+                self.message = str(json.loads(result.text)["message"]) + ',' if str(json.loads(result.text)["message"]) != 'Not Found,' else str(result.text) + ' '
                 log.error("call linkis-gateway error: %s ", self.message)
             log.info("call url get python_version is %s", python_version)
         except Exception as e:
-            log.error("get python version error: %s", e)
-            self.message = e + ","
+            log.error("get python version error: %s", str(e))
+            self.message = str(e) + ","
         return python_version
 
     def open(self, *args, **kwargs):
