@@ -68,12 +68,12 @@ class LanguageServerWebSocketHandler(websocket.WebSocketHandler):
                 log.info("default_python_version: %s, config_python_version: %s", default_python_version,
                          config_python_version)
             else:
-                self.message = str(json.loads(result.text)["message"]) + ',' if str(json.loads(result.text)["message"]) != 'Not Found,' else str(result.text) + ' '
-                log.error("call linkis-gateway error: %s ", self.message)
+                self.message = "linkis管理台请求失败！默认当前为python2版本，不支持纠错！"
+                log.error("call linkis-gatewayt error: %s ", str(json.loads(result.text)["message"]))
             log.info("call url get python_version is %s", python_version)
         except Exception as e:
             log.error("get python version error: %s", str(e))
-            self.message = str(e) + ","
+            self.message = str(e)
         return python_version
 
     def open(self, *args, **kwargs):
@@ -125,8 +125,8 @@ class LanguageServerWebSocketHandler(websocket.WebSocketHandler):
         context = json.loads(message)
         if self.ws_connection is None or self.ws_connection.is_closing():
             raise WebSocketClosedError()
-        if "method" in context and context["method"] == "textDocument/publishDiagnostics":
-            context.update({"message": self.content})
+        if "method" in context and context["method"] == "window/showMessage":
+            context.update({"params": {"type": 1, "message": self.message}})
             message = json.dumps(context)
         if isinstance(message, dict):
             message = tornado.escape.json_encode(message)
@@ -150,7 +150,6 @@ class LanguageServerWebSocketHandler(websocket.WebSocketHandler):
                         "text"]
                     context["params"]["textDocument"]["preLine"] = self.python_pre_line
                     context["params"]["textDocument"].update({"pythonVersion": self.python_python_version})
-                self.content = "{} current python version is {}".format(self.message or "", context["params"]["textDocument"]["pythonVersion"])
                 log.info("request method didOpen:%s", context)
             elif context["method"] == "textDocument/didChange":
                 if os.path.splitext(context["params"]["textDocument"]["uri"])[-1] == ".py":
@@ -165,7 +164,6 @@ class LanguageServerWebSocketHandler(websocket.WebSocketHandler):
                         range['range']['end']['line'] = range['range']['end']['line'] + self.python_pre_line
                     context["params"]["textDocument"]["preLine"] = self.python_pre_line
                     context["params"]["textDocument"].update({"pythonVersion": self.python_python_version})
-                self.content = "{} current python version is {}".format(self.message or "", context["params"]["textDocument"]["pythonVersion"])
                 log.info("request method didChange:%s", context)
             elif context["method"] == "textDocument/completion":
                 if os.path.splitext(context["params"]["textDocument"]["uri"])[-1] == ".py":
@@ -174,7 +172,6 @@ class LanguageServerWebSocketHandler(websocket.WebSocketHandler):
                 else:
                     context['params']['position']['line'] = context['params']['position']['line'] + self.python_pre_line
                     context["params"]["textDocument"].update({"pythonVersion": self.python_python_version})
-                self.content = "{} current python version is {}".format(self.message or "", context["params"]["textDocument"]["pythonVersion"])
             log.info("request method completion:%s", context)
             self.writer.write(context)
 
