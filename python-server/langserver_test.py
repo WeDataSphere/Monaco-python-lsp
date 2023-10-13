@@ -9,11 +9,11 @@ import tornado
 from tornado.websocket import WebSocketClosedError
 
 from properties_read import Properties
-from filter_util import filter_list_item1, filter_list_item2, read_file
+from filter_util import filter_list_item1, filter_list_item2, read_file, read_dict_file
 # from langserver_timer import timer_task
 from logging_config import GetLog
 
-from tornado import ioloop, process, web, websocket
+from tornado import ioloop, process, web, websocket, concurrent, locks
 
 from pylsp_jsonrpc import streams
 
@@ -28,6 +28,9 @@ class LanguageServerWebSocketHandler(websocket.WebSocketHandler):
     map_catch = {}
     py_content = read_file('./pre-import/pre_compile_py.py')
     python_content = read_file('./pre-import/pre_compile_python.py')
+    dict_data = read_dict_file('zh/zh_dict.json')
+    lock = locks.Lock()
+    executor = concurrent.futures.ThreadPoolExecutor(max_workers=10)
 
     def __init__(self, *args, **kwargs):
         log.info("python-server开始初始化：")
@@ -38,12 +41,14 @@ class LanguageServerWebSocketHandler(websocket.WebSocketHandler):
         self.message = None
         self.content = None
         # 读取配置文件
-        self.python_python_version = self.get_python_version(
-            self.server_address + "/api/rest_j/v1/configuration/getFullTreesByAppName",
-            {"creator": "IDE", "engineType": "python", "version": "python2"})
-        self.spark_python_version = self.get_python_version(
-            self.server_address + "/api/rest_j/v1/configuration/getFullTreesByAppName",
-            {"creator": "IDE", "engineType": "spark", "version": "2.4.3"})
+        self.python_python_version = "python2"
+        self.spark_python_version = "python2"
+        # self.python_python_version = self.get_python_version(
+        #     self.server_address + "/api/rest_j/v1/configuration/getFullTreesByAppName",
+        #     {"creator": "IDE", "engineType": "python", "version": "python2"})
+        # self.spark_python_version = self.get_python_version(
+        #     self.server_address + "/api/rest_j/v1/configuration/getFullTreesByAppName",
+        #     {"creator": "IDE", "engineType": "spark", "version": "2.4.3"})
         # 读取python spark预编译文件
         self.py_pre_line = LanguageServerWebSocketHandler.py_content['num_lines']
         self.py_pre_content = LanguageServerWebSocketHandler.py_content['content']
@@ -56,7 +61,7 @@ class LanguageServerWebSocketHandler(websocket.WebSocketHandler):
     def get_python_version(self, url, params):
         log.debug("get_python_version cookie:%s", self.cookie)
         # 默认为python2版本
-        python_version = "python2"
+        python_version = "python3"
         try:
             result = requests.get(url, params, headers={"Cookie": self.cookie})
             if result.ok and result.json():
@@ -113,7 +118,8 @@ class LanguageServerWebSocketHandler(websocket.WebSocketHandler):
         # consume this in another thread
         def consume():
             # Start a tornado IOLoop for reading/writing to the process in this thread
-            ioloop.IOLoop()
+            io_loop = ioloop.IOLoop()
+            io_loop.make_current()
             reader = streams.JsonRpcStreamReader(proc.stdout)
             reader.listen(lambda msg: self.write_message(json.dumps(msg)))
 
@@ -131,6 +137,10 @@ class LanguageServerWebSocketHandler(websocket.WebSocketHandler):
             message = json.dumps(context)
         if isinstance(message, dict):
             message = tornado.escape.json_encode(message)
+        if 'result' in context and 'label' in context["result"]:
+            context["result"]["documentation"] = LanguageServerWebSocketHandler.dict_data.get(context["result"]["label"])
+            message = json.dumps(context)
+        print("print message: %s", message)
         return self.ws_connection.write_message(message, binary=binary)
 
     def on_message(self, message):
@@ -221,4 +231,9 @@ if __name__ == "__main__":
         (r"/python", LanguageServerWebSocketHandler, {"config": config}),
     ])
     app.listen(config.get("server_port"))
+
+    # # 创建线程池执行器，并将IOLoop设置为当前循环事件
+    executor = concurrent.futures.ThreadPoolExecutor()
+    ioloop.IOLoop.current().set_default_executor(executor)
+
     ioloop.IOLoop.current().start()

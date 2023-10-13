@@ -1,3 +1,6 @@
+import json
+
+
 def filter_list_item1(item):
     if item["name"] in {"python引擎设置", "spark引擎设置"}:
         return True
@@ -20,3 +23,8 @@ def read_file(file_path):
         content = ''.join(content_lines)
         result = {'content': content, 'num_lines': num_lines}
         return result
+
+
+def read_dict_file(file_path):
+    with open(file_path, encoding='utf-8') as f:
+        return json.load(f)

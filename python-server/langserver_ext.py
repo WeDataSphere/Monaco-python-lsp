@@ -7,7 +7,7 @@ import tornado
 from typing import Union, Dict, Any
 from tornado.websocket import WebSocketClosedError
 from properties_read import Properties
-from filter_util import filter_list_item1, filter_list_item2, read_file
+from filter_util import filter_list_item1, filter_list_item2, read_file, read_dict_file
 from langserver_timer import timer_task
 from logging_config import GetLog
 
@@ -27,6 +27,7 @@ class LanguageServerWebSocketHandler(websocket.WebSocketHandler):
     map_catch = {}
     py_content = read_file('./python-server/pre-import/pre_compile_py.py')
     python_content = read_file('./python-server/pre-import/pre_compile_python.py')
+    dict_data = read_dict_file('zh/zh_dict.json')
 
     def __init__(self, *args, **kwargs):
         log.info("python-server开始初始化：")
@@ -130,6 +131,9 @@ class LanguageServerWebSocketHandler(websocket.WebSocketHandler):
             message = json.dumps(context)
         if isinstance(message, dict):
             message = tornado.escape.json_encode(message)
+        if 'result' in context and 'label' in context["result"]:
+            context["result"]["documentation"] = LanguageServerWebSocketHandler.dict_data.get(context["result"]["label"])
+            message = json.dumps(context)
         return self.ws_connection.write_message(message, binary=binary)
 
     def on_message(self, message):
@@ -172,7 +176,7 @@ class LanguageServerWebSocketHandler(websocket.WebSocketHandler):
                 else:
                     context['params']['position']['line'] = context['params']['position']['line'] + self.python_pre_line
                     context["params"]["textDocument"].update({"pythonVersion": self.python_python_version})
-            log.info("request method completion:%s", context)
+                log.info("request method completion:%s", context)
             self.writer.write(context)
 
     def check_origin(self, origin):
