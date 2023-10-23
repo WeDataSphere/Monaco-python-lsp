@@ -27,7 +27,7 @@ class LanguageServerWebSocketHandler(websocket.WebSocketHandler):
     map_catch = {}
     py_content = read_file('./python-server/pre-import/pre_compile_py.py')
     python_content = read_file('./python-server/pre-import/pre_compile_python.py')
-    dict_data = read_dict_file('zh/zh_dict.json')
+    dict_data = read_dict_file('./python-server/zh/zh_dict.json')
 
     def __init__(self, *args, **kwargs):
         log.info("python-server开始初始化：")
@@ -132,7 +132,8 @@ class LanguageServerWebSocketHandler(websocket.WebSocketHandler):
         if isinstance(message, dict):
             message = tornado.escape.json_encode(message)
         if 'result' in context and 'label' in context["result"]:
-            context["result"]["documentation"] = LanguageServerWebSocketHandler.dict_data.get(context["result"]["label"])
+            if LanguageServerWebSocketHandler.dict_data.get(context["result"]["label"]) is not None:
+                context["result"]["documentation"] = LanguageServerWebSocketHandler.dict_data.get(context["result"]["label"])
             message = json.dumps(context)
         return self.ws_connection.write_message(message, binary=binary)
 
