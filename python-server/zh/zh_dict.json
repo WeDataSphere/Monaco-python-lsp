@@ -1,3 +1,10 @@
 {
-  "max(arg1, arg2, _args, key)": "最大值"
+  "max(arg1, arg2, _args, key)": {
+    "kind": "markdown",
+    "value": "最大值"
+  },
+  "min(arg1, arg2, _args, key)": {
+    "kind": "markdown",
+    "value": "返回可迭代对象中最小的元素，或者返回两个及以上实参中最小的。\r\n有两个可选只能用关键字的实参。key 实参指定排序函数用的参数，如传给 `list.sort()` 的。`default` 实参是当可迭代对象为空时返回的值。如果可迭代对象为空，并且没有给 `default` ，则会触发 `ValueError` \r\n如果有多个最小元素，则此函数将返回第一个找到的。这和其他稳定排序工具如 `sorted(iterable, key=keyfunc)[0]` 和 `heapq.nsmallest(1, iterable, key=keyfunc)` 保持一致。 \r\n3.4 新版功能: keyword-only 实参 default 。 \r\n在 3.8 版更改: `key` 可以为 `None`。"
+  }
 }
