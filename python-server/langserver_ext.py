@@ -126,15 +126,13 @@ class LanguageServerWebSocketHandler(websocket.WebSocketHandler):
         context = json.loads(message)
         if self.ws_connection is None or self.ws_connection.is_closing():
             raise WebSocketClosedError()
-        if "method" in context and context["method"] == "window/showMessage":
-            context.update({"params": {"type": 1, "message": self.message}})
-            message = json.dumps(context)
+        if 'result' in context and context["result"] is not None and 'label' in context["result"]:
+            label = context["result"]["label"]
+            if label in LanguageServerWebSocketHandler.dict_data:
+                context["result"]["documentation"] = LanguageServerWebSocketHandler.dict_data.get(label)
+                message = json.dumps(context)
         if isinstance(message, dict):
             message = tornado.escape.json_encode(message)
-        if 'result' in context and 'label' in context["result"]:
-            if LanguageServerWebSocketHandler.dict_data.get(context["result"]["label"]) is not None:
-                context["result"]["documentation"] = LanguageServerWebSocketHandler.dict_data.get(context["result"]["label"])
-            message = json.dumps(context)
         return self.ws_connection.write_message(message, binary=binary)
 
     def on_message(self, message):
