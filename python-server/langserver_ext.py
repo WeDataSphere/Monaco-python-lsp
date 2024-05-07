@@ -32,6 +32,9 @@ class LanguageServerWebSocketHandler(websocket.WebSocketHandler):
     def __init__(self, *args, **kwargs):
         log.info("python-server开始初始化：")
         self.server_address = kwargs.pop("config").get("linkis_server_address")
+        self.llm_url = kwargs.pop("config").get("llm_url")
+        self.llm_app_key = kwargs.pop("config").get("llm_app_key")
+        self.llm_app_user = kwargs.pop("config").get("llm_app_user")
         super().__init__(*args, **kwargs)
         self.cookie = self.absolve_cookie()
         self.pid = None
@@ -167,6 +170,7 @@ class LanguageServerWebSocketHandler(websocket.WebSocketHandler):
                         range['range']['end']['line'] = range['range']['end']['line'] + self.python_pre_line
                     context["params"]["textDocument"]["preLine"] = self.python_pre_line
                     context["params"]["textDocument"].update({"pythonVersion": self.python_python_version})
+                context['params']['textDocument'].update({'llm_url': self.llm_url, 'llm_app_key': self.llm_app_key, 'llm_app_user': self.llm_app_user})
                 log.info("request method didChange:%s", context)
             elif context["method"] == "textDocument/completion":
                 if os.path.splitext(context["params"]["textDocument"]["uri"])[-1] == ".py":
