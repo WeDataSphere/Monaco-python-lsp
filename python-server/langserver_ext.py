@@ -31,10 +31,11 @@ class LanguageServerWebSocketHandler(websocket.WebSocketHandler):
 
     def __init__(self, *args, **kwargs):
         log.info("python-server开始初始化：")
-        self.server_address = kwargs.pop("config").get("linkis_server_address")
-        self.llm_url = kwargs.pop("config").get("llm_url")
-        self.llm_app_key = kwargs.pop("config").get("llm_app_key")
-        self.llm_app_user = kwargs.pop("config").get("llm_app_user")
+        config_map = kwargs.pop("config")
+        self.server_address = config_map.get("linkis_server_address")
+        self.llm_url = config_map.get("llm_url")
+        self.llm_app_key = config_map.get("llm_app_key")
+        self.llm_app_user = config_map.get("llm_app_user")
         super().__init__(*args, **kwargs)
         self.cookie = self.absolve_cookie()
         self.pid = None
