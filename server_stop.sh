@@ -27,6 +27,10 @@ current_time=$(date "+%Y.%m.%d-%H:%M:%S")
 for SERVER_PID in `ps aux | grep python-server/langserver_ext.py| egrep -v "grep" | awk '{print $2}'`
   do
     echo -e "[${current_time}][python-language-server] kill process id: ${SERVER_PID}" |tee -a ${record_path}
+    if [ -z "$SERVER_PID" ]; then
+       continue
+    fi
+    echo "kill server process ${SERVER_PID}"
     kill -15 "${SERVER_PID}";
 done
 
@@ -37,6 +41,10 @@ echo -e "check pylsp process"
 for PYLSP_PID in `ps aux | grep pylsp | egrep -v "grep" | awk '{print $2}'`
  do
    echo -e "[${current_time}][python-language-server] kill pylsp process id: ${PYLSP_PID}" |tee -a ${record_path}
+   if [ -z "$PYLSP_PID" ]; then
+       continue
+   fi
+   echo "kill pylsp process ${PYLSP_PID}"
    kill -15 ${PYLSP_PID};
 done
 
