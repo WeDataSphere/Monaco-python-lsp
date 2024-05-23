@@ -1,7 +1,10 @@
 import json
+import socket
 import subprocess
 import threading
 import os
+import traceback
+
 import requests
 import tornado
 from typing import Union, Dict, Any
@@ -153,8 +156,9 @@ class LanguageServerWebSocketHandler(websocket.WebSocketHandler):
                     context["params"]["textDocument"]["preLine"] = self.py_pre_line
                     context["params"]["textDocument"].update({"pythonVersion": self.spark_python_version})
                 else:
-                    context["params"]["textDocument"]["text"] = self.python_pre_content + context["params"]["textDocument"][
-                        "text"]
+                    context["params"]["textDocument"]["text"] = self.python_pre_content + \
+                                                                context["params"]["textDocument"][
+                                                                    "text"]
                     context["params"]["textDocument"]["preLine"] = self.python_pre_line
                     context["params"]["textDocument"].update({"pythonVersion": self.python_python_version})
                 log.info("request method didOpen:%s", context)
@@ -171,7 +175,8 @@ class LanguageServerWebSocketHandler(websocket.WebSocketHandler):
                         range['range']['end']['line'] = range['range']['end']['line'] + self.python_pre_line
                     context["params"]["textDocument"]["preLine"] = self.python_pre_line
                     context["params"]["textDocument"].update({"pythonVersion": self.python_python_version})
-                context['params']['textDocument'].update({'llm_url': self.llm_url, 'llm_app_key': self.llm_app_key, 'llm_app_user': self.llm_app_user})
+                context['params']['textDocument'].update(
+                    {'llm_url': self.llm_url, 'llm_app_key': self.llm_app_key, 'llm_app_user': self.llm_app_user})
                 log.info("request method didChange:%s", context)
             elif context["method"] == "textDocument/completion":
                 if os.path.splitext(context["params"]["textDocument"]["uri"])[-1] == ".py":
@@ -214,6 +219,40 @@ class LanguageServerWebSocketHandler(websocket.WebSocketHandler):
 
     def map_converse(self):
         return {self.cookie: [self.pid]}
+
+
+class LanguageServerRequestHandler(web.RequestHandler):
+
+    def __init__(self, *args, **kwargs):
+        config_map = kwargs.pop("config")
+        server_port = config_map.get("server_port")
+        host_ip = socket.gethostbyname(socket.gethostname())
+        if host_ip is None:
+            host_ip = "127.0.0.1"
+        self.websocket_url = f"ws://{host_ip}:{server_port}/python"
+        log.info(f"websocket url is {self.websocket_url}")
+        super().__init__(*args, **kwargs)
+
+    """
+    监听websocket是否正常连接
+    """
+
+    def get(self):
+        import websocket
+        ws = websocket.WebSocket()
+        try:
+            # 设置socket链接超时时间10秒
+            ws.connect(self.websocket_url, timeout=10)
+            if ws.status == 101:
+                self.write(f"websocket connect success,response code is {ws.status}")
+            else:
+                self.write(f"websocket connect fail,response code is {ws.status}")
+        except Exception as e:
+            log.error(e)
+            traceback.print_exc()
+            self.write(f"websocket connect error")
+        finally:
+            ws.close()
 
 
 if __name__ == "__main__":
