@@ -261,6 +261,11 @@ if __name__ == "__main__":
     timer_task(config.get("execute_time"))
     app = web.Application([
         (r"/python", LanguageServerWebSocketHandler, {"config": config}),
+        (r"/welb_health_check", LanguageServerRequestHandler, {"config": config}),
     ])
-    app.listen(config.get("server_port"))
+    # app.listen(config.get("server_port"))
+    httpServer = tornado.httpserver.HTTPServer(app)
+    httpServer.bind(config.get("server_port"))
+    # 开启多线程
+    httpServer.start(5)
     ioloop.IOLoop.current().start()
