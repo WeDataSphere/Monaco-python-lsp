@@ -1,10 +1,9 @@
 import json
-import socket
 import subprocess
 import threading
 import os
-import traceback
-
+import sys
+import socket
 import requests
 import tornado
 from typing import Union, Dict, Any
@@ -19,6 +18,8 @@ from tornado import ioloop, process, web, websocket
 from pylsp_jsonrpc import streams
 
 from lxpy import copy_headers_dict
+
+import traceback
 
 log = GetLog(os.path.basename(__file__)).get_log()
 
@@ -39,6 +40,8 @@ class LanguageServerWebSocketHandler(websocket.WebSocketHandler):
         self.llm_url = config_map.get("llm_url")
         self.llm_app_key = config_map.get("llm_app_key")
         self.llm_app_user = config_map.get("llm_app_user")
+        self.environment_path = config_map.get("environment_path")
+        log.info(f"environment_path is  {self.environment_path}")
         super().__init__(*args, **kwargs)
         self.cookie = self.absolve_cookie()
         self.pid = None
@@ -186,6 +189,8 @@ class LanguageServerWebSocketHandler(websocket.WebSocketHandler):
                     context['params']['position']['line'] = context['params']['position']['line'] + self.python_pre_line
                     context["params"]["textDocument"].update({"pythonVersion": self.python_python_version})
                 log.info("request method completion:%s", context)
+            elif context["method"] == "initialize":
+                context['params']['environmentPath'] = self.environment_path
             self.writer.write(context)
 
     def check_origin(self, origin):
@@ -263,9 +268,11 @@ if __name__ == "__main__":
         (r"/python", LanguageServerWebSocketHandler, {"config": config}),
         (r"/welb_health_check", LanguageServerRequestHandler, {"config": config}),
     ])
-    # app.listen(config.get("server_port"))
-    httpServer = tornado.httpserver.HTTPServer(app)
-    httpServer.bind(config.get("server_port"))
-    # 开启多线程
-    httpServer.start(5)
+    if sys.platform == "win32":
+        app.listen(config.get("server_port"))
+    else:
+        httpServer = tornado.httpserver.HTTPServer(app)
+        httpServer.bind(config.get("server_port"))
+        # 开启多线程
+        httpServer.start(5)
     ioloop.IOLoop.current().start()
