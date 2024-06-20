@@ -90,6 +90,10 @@ class LanguageServerWebSocketHandler(websocket.WebSocketHandler):
     def open(self, *args, **kwargs):
         log.info("Spawning pylsp subprocess")
 
+        if self.cookie is None:
+            log.warn("cookie is None is test connection")
+            return
+
         # Create an instance of the language server
         proc = process.Subprocess(
             ['./bin/python3', './bin/pylsp', '-vv'],
@@ -200,7 +204,7 @@ class LanguageServerWebSocketHandler(websocket.WebSocketHandler):
         log.info("=============on_close==============")
         log.info("=========before catch========")
         log.info("before on_close map_catch:%s ", self.map_catch)
-        if self.map_catch != {}:
+        if self.map_catch != {} and self.cookie is not None:
             for pid in self.map_catch[self.cookie]:
                 try:
                     log.info("<<<<<<kill pid>>>>>")
