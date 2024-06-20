@@ -204,7 +204,7 @@ class LanguageServerWebSocketHandler(websocket.WebSocketHandler):
         log.info("=============on_close==============")
         log.info("=========before catch========")
         log.info("before on_close map_catch:%s ", self.map_catch)
-        if self.map_catch != {} and self.cookie is not None:
+        if self.map_catch != {} and self.cookie:
             for pid in self.map_catch[self.cookie]:
                 try:
                     log.info("<<<<<<kill pid>>>>>")
