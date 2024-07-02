@@ -7,24 +7,25 @@ import socket
 import requests
 import tornado
 from typing import Union, Dict, Any
-from tornado.websocket import WebSocketClosedError
+from tornado.websocket import WebSocketClosedError, WebSocketHandler
 from properties_read import Properties
 from filter_util import filter_list_item1, filter_list_item2, read_file, read_dict_file
 from langserver_timer import timer_task
 from logging_config import GetLog
 
-from tornado import ioloop, process, web, websocket
+from tornado import ioloop, process, web
 
 from pylsp_jsonrpc import streams
 
 from lxpy import copy_headers_dict
 
 import traceback
+import websocket
 
 log = GetLog(os.path.basename(__file__)).get_log()
 
 
-class LanguageServerWebSocketHandler(websocket.WebSocketHandler):
+class LanguageServerWebSocketHandler(WebSocketHandler):
     """Setup tornado websocket handler to host an external language server."""
     log.info("=========LanguageServerWebSocketHandler=======")
     writer = None
@@ -47,6 +48,7 @@ class LanguageServerWebSocketHandler(websocket.WebSocketHandler):
         self.pid = None
         self.message = None
         self.content = None
+        self.lsp_websocket = websocket.WebSocket()
         # 读取配置文件
         self.python_python_version = self.get_python_version(
             self.server_address + "/api/rest_j/v1/configuration/getFullTreesByAppName",
@@ -94,42 +96,24 @@ class LanguageServerWebSocketHandler(websocket.WebSocketHandler):
             log.warn("cookie is None is test connection")
             return
 
-        # Create an instance of the language server
-        proc = process.Subprocess(
-            ['./bin/python3', './bin/pylsp', '-vv'],
-            stdin=subprocess.PIPE,
-            stdout=subprocess.PIPE
-        )
-
-        log.info("====================cookie=================")
-        log.info(self.cookie)
-        log.info(proc.pid)
-        log.info("==================cookie-end=================")
-        global map_catch
-        self.pid = proc.pid
-        cookie_map = self.map_converse()
-        if self.map_catch != {}:
-            for keys in list(self.map_catch.keys()):
-                if keys == self.cookie and self.map_catch[keys] != proc.pid:
-                    self.map_catch[self.cookie].append(proc.pid)
-                elif keys != self.cookie:
-                    self.map_catch.update(cookie_map)
-        else:
-            self.map_catch.update(cookie_map)
-        log.info("================map_catch================")
-        log.info(self.map_catch)
-        log.info("=============catch-end==============")
-
-        # Create a writer that formats json messages with the correct LSP headers
-        self.writer = streams.JsonRpcStreamWriter(proc.stdin)
+        host_ip = host_ip if (host_ip := socket.gethostbyname(socket.gethostname())) else "127.0.0.1"
+        self.lsp_websocket.connect(f"ws://{host_ip}:2087")
+        log.info(f"lsp_websocket status is {self.lsp_websocket.status}")
 
         # Create a reader for consuming stdout of the language server. We need to
         # consume this in another thread
         def consume():
             # Start a tornado IOLoop for reading/writing to the process in this thread
             ioloop.IOLoop()
-            reader = streams.JsonRpcStreamReader(proc.stdout)
-            reader.listen(lambda msg: self.write_message(json.dumps(msg)))
+            while self.lsp_websocket and self.lsp_websocket.connected:
+                try:
+                    message = self.lsp_websocket.recv()
+                    if not message:
+                        continue
+                    self.write_message(message)
+                except Exception as e:
+                    traceback.print_exc()
+                    log.warn("websockets exceptions ConnectionClosed")
 
         thread = threading.Thread(target=consume)
         thread.daemon = True
@@ -195,27 +179,20 @@ class LanguageServerWebSocketHandler(websocket.WebSocketHandler):
                 log.info("request method completion:%s", context)
             elif context["method"] == "initialize":
                 context['params']['environmentPath'] = self.environment_path
-            self.writer.write(context)
+
+            if self.lsp_websocket and self.lsp_websocket.connected:
+                self.lsp_websocket.send(json.dumps(context))
 
     def check_origin(self, origin):
         return True
 
     def on_close(self) -> None:
-        log.info("=============on_close==============")
-        log.info("=========before catch========")
-        log.info("before on_close map_catch:%s ", self.map_catch)
-        if self.map_catch != {} and self.cookie:
-            for pid in self.map_catch[self.cookie]:
-                try:
-                    log.info("<<<<<<kill pid>>>>>")
-                    log.info(pid)
-                    os.kill(int(pid), 15)
-                    log.info(True)
-                except Exception as err:
-                    log.error(err)
-            del self.map_catch[self.cookie]
-            log.info("=======after delete map_catch:=======")
-            log.info("after kill pylsp process map_catch: %s", self.map_catch)
+        log.info(f"=============on_close==============\n {self.cookie}")
+        if self.lsp_websocket and self.lsp_websocket.connected:
+            self.lsp_websocket.close()
+            # close 后，connected 状态为False
+            log.info(f"lsp_websocket connect status {self.lsp_websocket.connected}")
+
         log.info("==========close-end==============")
 
     def absolve_cookie(self):
@@ -232,51 +209,39 @@ class LanguageServerWebSocketHandler(websocket.WebSocketHandler):
 
 class LanguageServerRequestHandler(web.RequestHandler):
 
-    def __init__(self, *args, **kwargs):
-        config_map = kwargs.pop("config")
-        server_port = config_map.get("server_port")
-        host_ip = socket.gethostbyname(socket.gethostname())
-        if host_ip is None:
-            host_ip = "127.0.0.1"
-        self.websocket_url = f"ws://{host_ip}:{server_port}/python"
-        log.info(f"websocket url is {self.websocket_url}")
-        super().__init__(*args, **kwargs)
-
-    """
-    监听websocket是否正常连接
-    """
-
     def get(self):
-        import websocket
-        ws = websocket.WebSocket()
-        try:
-            # 设置socket链接超时时间10秒
-            ws.connect(self.websocket_url, timeout=10)
-            if ws.status == 101:
-                self.write(f"websocket connect success,response code is {ws.status}")
-            else:
-                self.write(f"websocket connect fail,response code is {ws.status}")
-        except Exception as e:
-            log.error(e)
-            traceback.print_exc()
-            self.write(f"websocket connect error")
-        finally:
-            ws.close()
+        self.write("websocket connect success,response code is 101")
+
+
+def run_pylsp_ws():
+    # 开启websocket 链接, 端口默认2087
+    proc = process.Subprocess(
+        ['./bin/python3', './bin/pylsp', '--ws', '-vv'],
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE
+    )
+
+    log.info(f"start pylsp websocket process id is {proc.pid}")
+
+
+def run_server(config):
+    app = web.Application([
+        (r"/python", LanguageServerWebSocketHandler, {"config": config}),
+        (r"/welb_health_check", LanguageServerRequestHandler),
+    ])
+    app.listen(config.get("server_port"))
+    # if sys.platform == "win32":
+    #     app.listen(config.get("server_port"))
+    # else:
+    #     httpServer = tornado.httpserver.HTTPServer(app)
+    #     httpServer.bind(config.get("server_port"))
+    #     # 开启多线程
+    #     httpServer.start(5)
+    ioloop.IOLoop.current().start()
 
 
 if __name__ == "__main__":
+    run_pylsp_ws()
     # 读取配置文件
-    config = Properties("params.properties").getProperties()
-    timer_task(config.get("execute_time"))
-    app = web.Application([
-        (r"/python", LanguageServerWebSocketHandler, {"config": config}),
-        (r"/welb_health_check", LanguageServerRequestHandler, {"config": config}),
-    ])
-    if sys.platform == "win32":
-        app.listen(config.get("server_port"))
-    else:
-        httpServer = tornado.httpserver.HTTPServer(app)
-        httpServer.bind(config.get("server_port"))
-        # 开启多线程
-        httpServer.start(5)
-    ioloop.IOLoop.current().start()
+    properties = Properties("params.properties").getProperties()
+    run_server(properties)
