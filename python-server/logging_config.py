@@ -29,7 +29,7 @@ class GetLog(object):
             # 按照日期切割日志文件
             timed_handler = TimedRotatingFileHandler(
                 filename=os.path.join(log_dir, 'python-server-out.log'),
-                when='M',
+                when='D',
                 interval=1,
                 backupCount=30,
                 encoding='utf-8'
@@ -38,7 +38,7 @@ class GetLog(object):
             size_handler = RotatingFileHandler(
                 filename=self.filename,
                 maxBytes=1024 * 1024 * 200,  # 每个日志文件的最大大小为200MB
-                backupCount=0,
+                backupCount=5,
                 encoding='utf-8'
             )
             # 设置handler等级
